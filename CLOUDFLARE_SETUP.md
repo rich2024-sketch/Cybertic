@@ -71,12 +71,20 @@ For a local Worker preview backed by local D1 state:
 pnpm run db:migrate:local
 ~~~
 
-For live study-note generation, additionally configure `OPENAI_API_KEY` and
-`OPENAI_BASE_URL` as runtime Secrets, `OPENAI_MODEL=gpt-5.4-mini`, and
-`STUDYMATE_ENABLE_LIVE_AI=true`. The existing Genspark proxy's compatibility
-from this separate host still needs verification. Its credentials do not
-transfer automatically; do not expose them in chat or logs. Until configured,
-sample/demo study behavior remains available.
+For live study-note generation and assignment extraction, set
+`STUDYMATE_ENABLE_LIVE_AI=true`. Then choose one server-side text backend:
+
+1. **Existing OpenAI-compatible proxy**: configure `OPENAI_API_KEY`,
+   `OPENAI_BASE_URL`, and `OPENAI_MODEL=gpt-5.4-mini`.
+2. **Direct Gemini text generation**: keep the existing
+   `GEMINI_LIVE_API_KEY`, optionally add `GEMINI_TEXT_MODEL`
+   (default: `gemini-2.5-flash`), and do not set `OPENAI_*` variables unless
+   you intentionally want the proxy to take precedence.
+
+The Google key stays server-side and is never forwarded to the OpenAI-
+compatible proxy. Until one of these text backends is enabled, sample/demo
+study behavior remains available and `/api/status` stays false even if
+`/api/live/status` is true.
 
 Lecture text, notes, quiz answers, and subject edits belong to the
 authenticated D1-backed workspace. Audio recordings still belong to the local

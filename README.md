@@ -51,7 +51,7 @@ Cloudflare Access identity is now the source of ownership. Lecture text, notes, 
 
 ## Continuous voice translation
 
-See [GEMINI_LIVE_SETUP.md](GEMINI_LIVE_SETUP.md) for the hosted activation steps and short acceptance test. Live speech uses a direct Google API key; study notes keep the existing Genspark proxy.
+See [GEMINI_LIVE_SETUP.md](GEMINI_LIVE_SETUP.md) for the hosted activation steps and short acceptance test. Live speech uses a direct Google API key; text AI can use either the existing Genspark proxy or direct Gemini text generation on the server.
 
 The microphone streams through an AudioWorklet to Gemini Live Translate. English audio is played directly, with a three-second local playback buffer limit. Source and English captions are saved with the original recording. Live mode does not call `/api/translate` for each sentence and does not use the browser's speech recognition or speech synthesis queues.
 
@@ -93,27 +93,34 @@ For a local/private demonstration, copy .env.example to .env.local and configure
 
 ~~~dotenv
 STUDYMATE_ENABLE_LIVE_AI=true
+STUDYMATE_APP_ORIGIN=
+
+# Option A: existing injected OpenAI-compatible proxy
 OPENAI_API_KEY=your_server_side_proxy_key
 OPENAI_BASE_URL=your_injected_proxy_base_url
 OPENAI_MODEL=gpt-5.4-mini
-STUDYMATE_APP_ORIGIN=
+
+# Option B: direct Gemini text generation using the server-side Google key
+GEMINI_LIVE_API_KEY=your_server_side_google_key
+GEMINI_TEXT_MODEL=gemini-2.5-flash
 ~~~
 
-Use the injected Genspark OpenAI-compatible proxy. The dedicated Google live-speech key is configured separately and does not replace these credentials.
+If the OpenAI-compatible proxy is configured, StudyMate keeps using it for text AI. Otherwise, when `STUDYMATE_ENABLE_LIVE_AI=true` and `GEMINI_LIVE_API_KEY` is present, `/api/status`, `/api/translate`, `/api/study`, and `/api/assignments` can use direct Gemini text generation on the server. The Google key stays server-side and is never sent to the OpenAI-compatible proxy.
 
 Restart the server. Behind a proxy, set STUDYMATE_APP_ORIGIN to the exact browser origin (scheme, hostname, and port if present).
 
-- /api/status returns only whether live AI is configured.
+- /api/status returns only whether text AI is configured.
 - /api/translate translates each final Korean speech segment.
 - /api/study translates a saved transcript, suggests an enrolled subject, and generates level-aware notes and three review questions.
+- /api/assignments extracts transcript-grounded assignments and deadlines in one server-side request when that feature is enabled.
 - The student confirms an AI subject suggestion before the lecture moves.
 - Requests are validated, bounded, timed out, and limited per server process. There are no automatic paid retries.
 - API keys remain server-side and are excluded from Git. Do not use NEXT_PUBLIC_ for a key.
-- Genspark proxy calls spend Genspark credits; direct Google calls follow the selected Google project's tier and quotas.
+- Genspark proxy calls spend Genspark credits; direct Google text calls follow the selected Google project's tier and quotas.
 
-Text AI sends recognised/pasted lecture text and academic context to the configured proxy. When continuous translation is enabled, microphone audio also streams to Google. The original recording remains in browser storage. Browser speech recognition, when explicitly used as a fallback, may use the browser vendor's online service.
+Text AI sends recognised/pasted lecture text and academic context either to the configured proxy or directly to Gemini, depending on server configuration. When continuous translation is enabled, microphone audio also streams to Google. The original recording remains in browser storage. Browser speech recognition, when explicitly used as a fallback, may use the browser vendor's online service.
 
-This API is a private-demo adapter, not a production multi-user service. Keep live AI disabled on public unauthenticated deployments until authentication, per-user quotas, durable rate limiting, and server-side account isolation have been added.
+This API is a private-demo adapter, not a public self-serve AI product. If text AI is disabled, StudyMate should clearly fall back to saved recordings and sample/demo study flows instead of fabricating notes or deadlines. Keep live AI disabled on public unauthenticated deployments until authentication, per-user quotas, durable rate limiting, and server-side account isolation have been added.
 
 ## Recording and voice limitations
 
@@ -142,9 +149,10 @@ This fallback waits for speech pauses. Select live translation for continuous vo
 | lib/studymate/workspace-server.ts | D1-backed workspace/profile persistence |
 | app/api/workspace/route.ts | Authenticated workspace load/save route |
 | app/api/profile/route.ts | First-login and profile update route |
-| lib/studymate/ai-server.ts | Provider adapter, limits, validation |
+| lib/studymate/ai-server.ts | Proxy/Gemini text provider adapter, limits, validation |
 | app/api/study/route.ts | Subject suggestion and study-note prompt |
 | app/api/translate/route.ts | Translation prompt |
+| app/api/assignments/route.ts | Assignment/deadline extraction prompt |
 
 Bundled components/ui primitives and infrastructure are supporting code. Genspark usually needs only the task-relevant StudyMate files in its prompt.
 

@@ -3,6 +3,7 @@ export type Student = { id: string; name: string; major: string; year: number; s
 export type Segment = { id: string; seconds: number; korean: string; english: string };
 export type Question = { question: string; options: string[]; answer: number; explanation: string };
 export type StudyNotes = { overview: string; takeaways: string[]; terms: { term: string; korean: string; explanation: string }[]; questions: Question[] };
+export type AssignmentKind = "assignment" | "exam" | "deadline";
 export type Lecture = { id: string; studentId: string; subjectId: string | null; title: string; createdAt: string; duration: number; mode: "sample" | "recording"; sampleId?: string; segments: Segment[]; notes: StudyNotes | null; notesYear: number; hasAudio: boolean; quizAnswers: Record<number, number> };
 export type Store = { version: 1; students: Student[]; activeStudentId: string | null; lectures: Lecture[] };
 export type Sample = { id: string; subject: string; title: string; segments: Omit<Segment, "id">[]; foundational: StudyNotes; advanced: StudyNotes };

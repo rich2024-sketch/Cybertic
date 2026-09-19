@@ -49,9 +49,53 @@ test("every demo quiz has exactly three questions and valid answer indices", () 
  for (const sample of samples) for (const level of [1, 4]) { const notes = sampleNotes(sample, level); assert.equal(notes.questions.length, 3); for (const q of notes.questions) assert.ok(q.answer >= 0 && q.answer < q.options.length); }
 });
 test("live AI stays disabled until explicitly configured", async () => {
- const old = process.env.STUDYMATE_ENABLE_LIVE_AI; process.env.STUDYMATE_ENABLE_LIVE_AI = "false";
- assert.equal(liveConfig().enabled, false); await assert.rejects(generateJSON("test", {}, 10), /not connected/);
- if (old === undefined) delete process.env.STUDYMATE_ENABLE_LIVE_AI; else process.env.STUDYMATE_ENABLE_LIVE_AI = old;
+ const keys = ["STUDYMATE_ENABLE_LIVE_AI", "OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_MODEL", "GEMINI_LIVE_API_KEY", "GEMINI_TEXT_MODEL"];
+ const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+ process.env.STUDYMATE_ENABLE_LIVE_AI = "false";
+ delete process.env.OPENAI_API_KEY;
+ delete process.env.OPENAI_BASE_URL;
+ delete process.env.OPENAI_MODEL;
+ delete process.env.GEMINI_LIVE_API_KEY;
+ delete process.env.GEMINI_TEXT_MODEL;
+ assert.equal(liveConfig().enabled, false);
+ await assert.rejects(generateJSON("test", {}, 10), /not connected/);
+ for (const [key, value] of Object.entries(previous)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+});
+
+test("live AI can use the direct Gemini text backend with the existing Gemini key", () => {
+ const keys = ["STUDYMATE_ENABLE_LIVE_AI", "OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_MODEL", "GEMINI_LIVE_API_KEY", "GEMINI_TEXT_MODEL"];
+ const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+ Object.assign(process.env, {
+  STUDYMATE_ENABLE_LIVE_AI: "true",
+  GEMINI_LIVE_API_KEY: "test-gemini-key",
+  GEMINI_TEXT_MODEL: "gemini-2.5-flash",
+ });
+ delete process.env.OPENAI_API_KEY;
+ delete process.env.OPENAI_BASE_URL;
+ delete process.env.OPENAI_MODEL;
+ const config = liveConfig();
+ assert.equal(config.enabled, true);
+ assert.equal(config.provider, "gemini");
+ assert.equal(config.model, "gemini-2.5-flash");
+ for (const [key, value] of Object.entries(previous)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+});
+
+test("OpenAI proxy config still takes precedence when explicitly configured", () => {
+ const keys = ["STUDYMATE_ENABLE_LIVE_AI", "OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_MODEL", "GEMINI_LIVE_API_KEY", "GEMINI_TEXT_MODEL"];
+ const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+ Object.assign(process.env, {
+  STUDYMATE_ENABLE_LIVE_AI: "true",
+  OPENAI_API_KEY: "proxy-key",
+  OPENAI_BASE_URL: "https://proxy.example/v1",
+  OPENAI_MODEL: "gpt-5.4-mini",
+  GEMINI_LIVE_API_KEY: "gemini-key",
+  GEMINI_TEXT_MODEL: "gemini-2.5-flash",
+ });
+ const config = liveConfig();
+ assert.equal(config.enabled, true);
+ assert.equal(config.provider, "openai");
+ assert.equal(config.baseUrl, "https://proxy.example/v1");
+ for (const [key, value] of Object.entries(previous)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
 });
 test("AI cannot silently file lectures under invented classes", () => {
  const input = studyInput.parse({ major: "Biology", year: 1, subjects: [{ id: "bio", name: "Biology" }], segments: [{ id: "one", korean: "세포막" }] });
@@ -60,7 +104,7 @@ test("AI cannot silently file lectures under invented classes", () => {
  assert.throws(() => validateStudyResult({ ...result, translations: [{ id: "wrong", english: "Text" }] }, input), /every transcript/);
 });
 test("API rejects cross-origin and oversized requests before provider work", async () => {
- const keys = ["STUDYMATE_ENABLE_LIVE_AI", "OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_MODEL", "STUDYMATE_APP_ORIGIN"];
+ const keys = ["STUDYMATE_ENABLE_LIVE_AI", "OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_MODEL", "GEMINI_LIVE_API_KEY", "GEMINI_TEXT_MODEL", "STUDYMATE_APP_ORIGIN"];
  const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
  Object.assign(process.env, { STUDYMATE_ENABLE_LIVE_AI: "true", OPENAI_API_KEY: "test-only-not-a-real-key", OPENAI_BASE_URL: "https://proxy.example/v1", OPENAI_MODEL: "test-model", STUDYMATE_APP_ORIGIN: "https://study.example" });
  try {
