@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cybertic",
+  "main": "dist/server/index.js",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "no_bundle": true,
+  "rules": [{ "type": "ESModule", "globs": ["**/*.js", "**/*.mjs"] }],
+  "assets": { "directory": "dist/client" },
+  // Configure runtime variables in your own Cloudflare dashboard. In
+  // particular, do not inherit the Genspark origin or its enabled AI flag.
+  "keep_vars": true
+}
