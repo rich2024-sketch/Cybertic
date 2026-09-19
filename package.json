@@ -12,12 +12,14 @@
     "start": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 execute cybertic-studymate --config wrangler.cloudflare.jsonc --local --file db/migrations/0001_access_workspaces.sql",
+    "db:migrate:cloudflare": "wrangler d1 execute cybertic-studymate --config wrangler.cloudflare.jsonc --remote --file db/migrations/0001_access_workspaces.sql",
     "dev:next": "next dev",
     "build:next": "next build",
     "build:cloudflare": "vinext build",
     "deploy:cloudflare": "wrangler deploy --config wrangler.cloudflare.jsonc",
     "start:next": "next start",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "test": "node scripts/test-studymate.mjs && node scripts/test-live-translation.mjs"
   },
   "dependencies": {
@@ -31,6 +33,7 @@
     "drizzle-orm": "0.45.2",
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
+    "jose": "^6.1.0",
     "lucide-react": "^1.31.0",
     "next": "16.3.4",
     "next-themes": "^0.4.6",

@@ -14,7 +14,7 @@ pnpm install --frozen-lockfile
 pnpm dev:next --hostname 0.0.0.0 --port 3000
 ~~~
 
-Open http://localhost:3000. Choose a demo student, press **Start Recording**, and play a sample lecture. Let all five transcript segments appear, then save. Notes and a three-question quiz will be available inside that lecture.
+Open http://localhost:3000. On first local launch, StudyMate can use the optional dev-only Access mock from `.env.local` so you can create one authenticated student profile. Then press **Start Recording** and play a sample lecture. Let all five transcript segments appear, then save. Notes and a three-question quiz will be available inside that lecture.
 
 For a normal Next.js production build:
 
@@ -27,13 +27,15 @@ The original dev and build scripts also support the included Vinext/Cloudflare d
 
 ## What works now
 
-- Two editable demo profiles from different majors and academic years.
-- Any major and editable enrolled subjects, with stable subject IDs.
+- Server-verified authenticated student profiles via Cloudflare Access.
+- First-login profile setup linked to the verified Access session.
+- Editable enrolled subjects with stable subject IDs.
+- Backend workspace storage in Cloudflare D1 for profile, lecture text, notes, and quiz state.
 - Separate lecture sessions with title, date, duration, and subject folder.
 - Real microphone recording, pause/resume, replay, and audio download.
 - Optional continuous Korean-to-English speech translation with Gemini Live Translate, with source and English captions.
 - Korean browser speech recognition as a separate fallback where supported.
-- Browser storage: profile/text data in localStorage; audio blobs in IndexedDB.
+- Device-local audio blobs in IndexedDB, kept separate from the synced text workspace.
 - Full Biology and History sample journeys with Korean/English segments.
 - Sample subject matching, with manual correction or an Unfiled folder.
 - Summary depth chosen by academic year; sample content has two prepared levels.
@@ -45,7 +47,7 @@ The original dev and build scripts also support the included Vinext/Cloudflare d
 
 **Sample transcripts, translations, subject matches, notes, and questions are prepared fixtures. They are labelled as samples. Sample playback does not produce a microphone recording.**
 
-Demo profile selection is not authentication. It separates interface data, not access permissions. School data is fictional. Clearing browser storage removes local work; this version does not sync across devices.
+Cloudflare Access identity is now the source of ownership. Lecture text, notes, subjects, and quiz answers sync to the authenticated backend workspace. Audio recordings still remain on the recording device unless the student downloads them.
 
 ## Continuous voice translation
 
@@ -54,6 +56,34 @@ See [GEMINI_LIVE_SETUP.md](GEMINI_LIVE_SETUP.md) for the hosted activation steps
 The microphone streams through an AudioWorklet to Gemini Live Translate. English audio is played directly, with a three-second local playback buffer limit. Source and English captions are saved with the original recording. Live mode does not call `/api/translate` for each sentence and does not use the browser's speech recognition or speech synthesis queues.
 
 This feature is disabled until its dedicated server flag, Google key, and app origin are configured. The hosted SSO allowlist must continue to protect `/api/live/*`.
+
+## Authenticated profiles and backend storage
+
+StudyMate now expects production traffic to arrive through Cloudflare Access. The app verifies the `Cf-Access-Jwt-Assertion` token server-side against your Cloudflare Access team domain and audience tag before loading or saving a student workspace.
+
+Required production additions for authenticated profiles:
+
+~~~dotenv
+CF_ACCESS_TEAM_DOMAIN=https://<your-team>.cloudflareaccess.com
+CF_ACCESS_AUD=<your-access-application-aud>
+~~~
+
+Required D1 setup:
+
+1. Create a D1 database for StudyMate.
+2. Bind it to the Worker as `DB`.
+3. Apply `db/migrations/0001_access_workspaces.sql`.
+4. Keep `/api/live/*`, `/api/profile`, and `/api/workspace` behind Cloudflare Access.
+
+For local sandbox/localhost preview only, you may set:
+
+~~~dotenv
+STUDYMATE_ALLOW_DEV_AUTH_MOCK=true
+STUDYMATE_DEV_ACCESS_EMAIL=student@example.com
+STUDYMATE_DEV_ACCESS_NAME=Local Student
+~~~
+
+This mock is only for local development. Leave it disabled in production.
 
 ## Optional text AI
 
@@ -101,12 +131,17 @@ This fallback waits for speech pauses. Select live translation for continuous vo
 
 | Path | Purpose |
 | --- | --- |
-| components/studymate/app.tsx | Demo login, dashboard, subjects, profile |
+| components/studymate/app.tsx | Authenticated workspace shell, first-login setup, dashboard, subjects, profile |
 | components/studymate/recording.tsx | Microphone, sample playback, transcript, saving |
 | components/studymate/session.tsx | Summary, transcript, quiz, export |
 | app/globals.css | Theme and responsive layouts |
-| lib/studymate/demo.ts | Fictional profiles and prepared lessons |
-| lib/studymate/storage.ts | Local text/audio persistence |
+| lib/studymate/demo.ts | Prepared sample lessons |
+| lib/studymate/storage.ts | Device-local audio persistence |
+| lib/studymate/access-server.ts | Cloudflare Access JWT verification |
+| lib/studymate/workspace.ts | Shared authenticated workspace schemas and profile helpers |
+| lib/studymate/workspace-server.ts | D1-backed workspace/profile persistence |
+| app/api/workspace/route.ts | Authenticated workspace load/save route |
+| app/api/profile/route.ts | First-login and profile update route |
 | lib/studymate/ai-server.ts | Provider adapter, limits, validation |
 | app/api/study/route.ts | Subject suggestion and study-note prompt |
 | app/api/translate/route.ts | Translation prompt |
@@ -125,6 +160,7 @@ One teammate can manage app changes while the other prepares Korean demo materia
 pnpm typecheck
 pnpm test
 pnpm build:next
+pnpm build:cloudflare
 ~~~
 
 Tests cover account separation, persistence, corrupted data, valid subject moves, level-specific samples, quiz validity, disabled AI, unexpected AI subject IDs, and API boundaries.
@@ -136,4 +172,4 @@ Microphone hardware, browser-specific STT/TTS, and real paid AI responses requir
 - [Gemini generateContent API](https://ai.google.dev/api/generate-content)
 - [Browser SpeechRecognition](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition)
 
-Future scope includes production login, cross-device storage, dedicated streaming speech services, and the original calendar and faculty-board ideas.
+Future scope includes durable server-side audio uploads (for cross-device playback), dedicated streaming speech services, and the original calendar and faculty-board ideas.

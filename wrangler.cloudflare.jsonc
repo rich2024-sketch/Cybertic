@@ -7,6 +7,15 @@
   "no_bundle": true,
   "rules": [{ "type": "ESModule", "globs": ["**/*.js", "**/*.mjs"] }],
   "assets": { "directory": "dist/client" },
+  // Authenticated StudyMate profiles need a D1 binding named DB.
+  // Create the database first, then replace the placeholder database_id below.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cybertic-studymate",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+    }
+  ],
   // Configure runtime variables in your own Cloudflare dashboard. In
   // particular, do not inherit the Genspark origin or its enabled AI flag.
   "keep_vars": true

@@ -9,16 +9,17 @@ import ts from "typescript";
 const root = process.cwd();
 await mkdir(path.join(root, ".sites-runtime"), { recursive: true });
 const temp = await mkdtemp(path.join(root, ".sites-runtime", "studymate-tests-"));
-for (const file of ["types", "demo", "storage", "ai-server"]) {
+for (const file of ["types", "demo", "storage", "ai-server", "workspace"]) {
  const source = await readFile(path.join(root, "lib/studymate", file + ".ts"), "utf8");
  const { outputText } = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } });
- await writeFile(path.join(temp, file + ".js"), outputText.replace(/from "\.\/(types|demo)"/g, 'from "./$1.js"'));
+ await writeFile(path.join(temp, file + ".js"), outputText.replace(/from "\.\/(types|demo|workspace)"/g, 'from "./$1.js"'));
 }
 const load = name => import(pathToFileURL(path.join(temp, name + ".js")).href);
 const { initialStore, samples, sampleNotes } = await load("demo");
 const { moveLecture } = await load("types");
 const { readStore, writeStore } = await load("storage");
 const { liveConfig, generateJSON, readBody, studyInput, validateStudyResult } = await load("ai-server");
+const { createStoreFromProfile, mergeProfileIntoStore, normalizeStore } = await load("workspace");
 const memory = new Map();
 Object.defineProperty(globalThis, "localStorage", { configurable: true, value: { getItem: k => memory.get(k) ?? null, setItem: (k, v) => memory.set(k, v) } });
 after(async () => { await rm(temp, { recursive: true, force: true }); });
@@ -66,4 +67,67 @@ test("API rejects cross-origin and oversized requests before provider work", asy
   await assert.rejects(readBody(new Request("https://study.example/api/study", { method: "POST", headers: { origin: "https://other.example", "content-type": "application/json" }, body: "{}" })), e => e.status === 403);
   await assert.rejects(readBody(new Request("https://study.example/api/study", { method: "POST", headers: { origin: "https://study.example", "content-type": "application/json" }, body: JSON.stringify({ text: "x".repeat(210000) }) })), e => e.status === 413);
  } finally { for (const [key, value] of Object.entries(previous)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } }
+});
+
+test("authenticated profile creation starts with one active student", () => {
+ const store = createStoreFromProfile({
+  name: "Amina Yusuf",
+  school: "Korea University",
+  major: "Linguistics",
+  year: 2,
+  subjects: [{ id: "ling-101", name: "Phonetics", code: "LING 101", color: "blue" }],
+ });
+ assert.equal(store.students.length, 1);
+ assert.equal(store.activeStudentId, store.students[0].id);
+ assert.equal(store.lectures.length, 0);
+});
+
+test("profile updates keep lectures but unfile removed subjects", () => {
+ const original = createStoreFromProfile({
+  name: "Mina Park",
+  school: "Yonsei University",
+  major: "Biology",
+  year: 1,
+  subjects: [
+   { id: "bio-1", name: "Biology", code: "BIO 101", color: "blue" },
+   { id: "chem-1", name: "Chemistry", code: "CHEM 101", color: "teal" },
+  ],
+ });
+ const student = original.students[0];
+ original.lectures.push({
+  id: "lecture-1",
+  studentId: student.id,
+  subjectId: "chem-1",
+  title: "Acids and bases",
+  createdAt: new Date("2026-09-19T00:00:00.000Z").toISOString(),
+  duration: 1800,
+  mode: "recording",
+  segments: [{ id: "seg-1", seconds: 0, korean: "산과 염기", english: "Acids and bases" }],
+  notes: null,
+  notesYear: 1,
+  hasAudio: false,
+  quizAnswers: {},
+ });
+ const updated = mergeProfileIntoStore(original, {
+  name: student.name,
+  school: student.school,
+  major: "Biochemistry",
+  year: 2,
+  subjects: [{ id: "bio-1", name: "Biology", code: "BIO 101", color: "blue" }],
+ });
+ assert.equal(updated.students[0].major, "Biochemistry");
+ assert.equal(updated.lectures[0].subjectId, null);
+ assert.equal(updated.lectures[0].studentId, student.id);
+});
+
+test("workspace normalization rejects multiple student profiles", () => {
+ assert.throws(() => normalizeStore({
+  version: 1,
+  activeStudentId: "a",
+  students: [
+   { id: "a", name: "One", major: "Biology", year: 1, school: "Test", subjects: [] },
+   { id: "b", name: "Two", major: "History", year: 2, school: "Test", subjects: [] },
+  ],
+  lectures: [],
+ }), /exactly 1 element|one active student|array/i);
 });

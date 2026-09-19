@@ -43,10 +43,33 @@ text AI service stay disabled until their required runtime settings exist.
 | `GEMINI_LIVE_API_KEY` | Secret | Your Google AI Studio API key, entered directly in Cloudflare |
 | `STUDYMATE_ENABLE_LIVE_TRANSLATION` | Text | `true` |
 | `STUDYMATE_APP_ORIGIN` | Text | The exact new HTTPS app origin, with no trailing slash |
+| `CF_ACCESS_TEAM_DOMAIN` | Text | `https://<your-team>.cloudflareaccess.com` |
+| `CF_ACCESS_AUD` | Text | The Access application AUD tag for this StudyMate app |
 
 3. Apply the changes. In a signed-in browser, `/api/live/status` should report
    `enabled: true`. This checks configuration presence, not Google model access.
 4. Run the short microphone acceptance test in `GEMINI_LIVE_SETUP.md`.
+
+For authenticated student profiles and backend workspace storage, also create a
+Cloudflare D1 database named `cybertic-studymate`, bind it to the Worker as
+`DB`, then replace the placeholder `database_id` in `wrangler.cloudflare.jsonc`.
+Apply `db/migrations/0001_access_workspaces.sql` afterwards. The app verifies
+`Cf-Access-Jwt-Assertion` server-side against `CF_ACCESS_TEAM_DOMAIN` and
+`CF_ACCESS_AUD` before it loads or saves a workspace. Without the D1 binding,
+live translation can still work, but the authenticated workspace cannot open.
+
+Suggested Wrangler commands after your database exists:
+
+~~~bash
+pnpm exec wrangler d1 create cybertic-studymate
+pnpm run db:migrate:cloudflare
+~~~
+
+For a local Worker preview backed by local D1 state:
+
+~~~bash
+pnpm run db:migrate:local
+~~~
 
 For live study-note generation, additionally configure `OPENAI_API_KEY` and
 `OPENAI_BASE_URL` as runtime Secrets, `OPENAI_MODEL=gpt-5.4-mini`, and
@@ -55,8 +78,12 @@ from this separate host still needs verification. Its credentials do not
 transfer automatically; do not expose them in chat or logs. Until configured,
 sample/demo study behavior remains available.
 
-Saved lectures belong to the browser origin. Existing Genspark-origin browser
-recordings are not automatically visible at the new Cloudflare URL.
+Lecture text, notes, quiz answers, and subject edits belong to the
+authenticated D1-backed workspace. Audio recordings still belong to the local
+browser origin and are not automatically visible on another device or at a new
+origin unless the student downloads them. Development mock authentication is
+restricted to localhost-style preview hosts and still requires
+`STUDYMATE_ALLOW_DEV_AUTH_MOCK=true`; it cannot be used on production domains.
 
 Do not enable paid plans or Google billing as part of this setup. Build success
 does not establish that the app fits every Free-plan runtime limit; check the
