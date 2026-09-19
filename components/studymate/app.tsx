@@ -9,19 +9,29 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import type { Lecture, Store, Student } from "@/lib/studymate/types";
 import { initials, newId, yearLabel } from "@/lib/studymate/types";
 import { readStore, writeStore } from "@/lib/studymate/storage";
+import { initialStore } from "@/lib/studymate/demo";
 import { Brand, Blank, LectureRow, Picker } from "./common";
 import { Recording } from "./recording";
 import { LectureDetail } from "./session";
 
 type Route = { page: "home" | "subjects" | "profile" | "record" | "subject" | "lecture"; id?: string };
+type BootState = { store: Store | null; problem: string; route: Route };
 function routeFromHash(): Route { const [page, id] = location.hash.replace(/^#\/?/, "").split("/"); return { page: ["home", "subjects", "profile", "subject", "lecture"].includes(page) ? page as Route["page"] : "home", id }; }
+function bootstrapApp(): BootState {
+ if (typeof window === "undefined") return { store: initialStore(), problem: "", route: { page: "home" } };
+ try { return { store: readStore(), problem: "", route: routeFromHash() }; }
+ catch (e) { return { store: null, problem: e instanceof Error ? e.message : "Could not load your data.", route: { page: "home" } }; }
+}
 
 export default function StudyMate() {
- const [store, setStore] = useState<Store | null>(null);
- const storeRef = useRef<Store | null>(null);
- const [problem, setProblem] = useState("");
- const [route, setRoute] = useState<Route>({ page: "home" });
+ const bootRef = useRef<BootState | null>(null);
+ if (!bootRef.current) bootRef.current = bootstrapApp();
+ const [store, setStore] = useState<Store | null>(bootRef.current.store);
+ const storeRef = useRef<Store | null>(bootRef.current.store);
+ const [problem, setProblem] = useState(bootRef.current.problem);
+ const [route, setRoute] = useState<Route>(bootRef.current.route);
  const [aiReady, setAiReady] = useState(false);
+ const [mounted, setMounted] = useState(false);
  useEffect(() => {
   const context = (document as Document & { modelContext?: { registerTool: (tool: { name: string; description: string; inputSchema: object; annotations: object; execute: (input: unknown) => unknown }, options: { signal: AbortSignal }) => unknown } }).modelContext;
   if (!context?.registerTool) return;
@@ -35,7 +45,8 @@ export default function StudyMate() {
   return () => controller.abort();
  }, []);
  useEffect(() => {
-  try { const loaded = readStore(); storeRef.current = loaded; setStore(loaded); setRoute(routeFromHash()); } catch (e) { setProblem(e instanceof Error ? e.message : "Could not load your data."); }
+  setMounted(true);
+  try { const loaded = readStore(); storeRef.current = loaded; setStore(loaded); setProblem(""); setRoute(routeFromHash()); } catch (e) { setProblem(e instanceof Error ? e.message : "Could not load your data."); }
   const hash = () => setRoute(routeFromHash()); window.addEventListener("hashchange", hash);
   fetch("/api/status").then(r => r.json()).then(r => setAiReady(!!r && typeof r === "object" && "enabled" in r && r.enabled === true)).catch(() => {});
   return () => window.removeEventListener("hashchange", hash);
@@ -49,10 +60,10 @@ export default function StudyMate() {
  if (problem) return <main className="boot"><Brand /><h1>We couldn’t load your saved work</h1><p>{problem}</p><Button onClick={() => location.reload()}>Try again</Button></main>;
  if (!store) return <main className="boot"><Brand /><p>Opening your study space…</p></main>;
  const student = store.students.find(s => s.id === store.activeStudentId);
- if (!student) return <><DemoLogin students={store.students} onChoose={id => { if (update(s => ({ ...s, activeStudentId: id }))) go("home"); }} /><Toaster position="top-center" richColors /></>;
+ if (!student) return <><DemoLogin students={store.students} onChoose={id => { if (update(s => ({ ...s, activeStudentId: id }))) go("home"); }} />{mounted && <Toaster position="top-center" richColors />}</>;
  const lectures = store.lectures.filter(l => l.studentId === student.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
  function saveLecture(lecture: Lecture) { return update(s => ({ ...s, lectures: [...s.lectures.filter(l => l.id !== lecture.id), lecture] })); }
- if (route.page === "record") return <><Recording student={student} initialSubjectId={route.id} aiReady={aiReady} onCancel={() => go("home")} onSave={lecture => { if (saveLecture(lecture)) { go("lecture", lecture.id); toast.success("Lecture saved to your study space."); return true; } return false; }} /><Toaster position="top-center" richColors /></>;
+ if (route.page === "record") return <><Recording student={student} initialSubjectId={route.id} aiReady={aiReady} onCancel={() => go("home")} onSave={lecture => { if (saveLecture(lecture)) { go("lecture", lecture.id); toast.success("Lecture saved to your study space."); return true; } return false; }} />{mounted && <Toaster position="top-center" richColors />}</>;
  const subject = student.subjects.find(s => s.id === route.id);
  const lecture = lectures.find(l => l.id === route.id);
  const title = route.page === "home" ? "Overview" : route.page === "subjects" ? "My subjects" : route.page === "profile" ? "My profile" : route.page === "subject" ? subject?.name ?? "Subject" : "Lecture notes";
@@ -62,7 +73,7 @@ export default function StudyMate() {
  {route.page === "subject" && (subject ? <><Button variant="ghost" className="back-link" onClick={() => go("subjects")}>← All subjects</Button><div className="page-heading"><div><p className="eyebrow">{subject.code}</p><h1>{subject.name}</h1><p>{lectures.filter(l => l.subjectId === subject.id).length} saved lecture sessions</p></div><Button onClick={() => go("record", subject.id)}><Mic size={17} />Record this class</Button></div><div className="lecture-list">{lectures.filter(l => l.subjectId === subject.id).length ? lectures.filter(l => l.subjectId === subject.id).map(l => <LectureRow key={l.id} lecture={l} subject={subject} onClick={() => go("lecture", l.id)} />) : <Blank title="A fresh page for this subject" description="Recordings, translations, notes, and quizzes for each class session will appear here." action="Start Recording" onAction={() => go("record", subject.id)} />}</div></> : <Blank title="Subject not found" description="Choose one of the subjects in your profile." action="My subjects" onAction={() => go("subjects")} />)}
  {route.page === "lecture" && (lecture ? <LectureDetail key={lecture.id} lecture={lecture} student={student} aiReady={aiReady} onChange={saveLecture} onBack={() => go(lecture.subjectId ? "subject" : "subjects", lecture.subjectId ?? undefined)} /> : <Blank title="Lecture not found" description="This session is not available in the selected demo account." action="Go home" onAction={() => go("home")} />)}
  {route.page === "profile" && <Profile student={student} lectures={lectures} onSave={next => { const ok = update(s => ({ ...s, students: s.students.map(u => u.id === next.id ? next : u) })); if (ok) toast.success("Profile saved."); return ok; }} />}
- </main></SidebarInset><Toaster position="top-center" richColors /></SidebarProvider>;
+ </main></SidebarInset>{mounted && <Toaster position="top-center" richColors />}</SidebarProvider>;
 }
 
 function DemoLogin({ students, onChoose }: { students: Student[]; onChoose: (id: string) => void }) {

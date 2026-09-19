@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "studymate",
+  "main": "dist/server/index.js",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "STUDYMATE_ENABLE_LIVE_AI": "true",
+    "OPENAI_MODEL": "gpt-5.4-mini",
+    "GEMINI_MODEL": "gpt-5.4-mini",
+    "STUDYMATE_APP_ORIGIN": "https://6a8a1fcb-f2ef-4c4b-a4c1-d74253e503a6.vip.gensparksite.com"
+  },
+  "assets": {
+    "directory": "dist/client"
+  }
+}
