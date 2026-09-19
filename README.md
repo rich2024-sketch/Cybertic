@@ -31,7 +31,8 @@ The original dev and build scripts also support the included Vinext/Cloudflare d
 - Any major and editable enrolled subjects, with stable subject IDs.
 - Separate lecture sessions with title, date, duration, and subject folder.
 - Real microphone recording, pause/resume, replay, and audio download.
-- Korean browser speech recognition where supported.
+- Optional continuous Korean-to-English speech translation with Gemini Live Translate, with source and English captions.
+- Korean browser speech recognition as a separate fallback where supported.
 - Browser storage: profile/text data in localStorage; audio blobs in IndexedDB.
 - Full Biology and History sample journeys with Korean/English segments.
 - Sample subject matching, with manual correction or an Unfiled folder.
@@ -39,14 +40,22 @@ The original dev and build scripts also support the included Vinext/Cloudflare d
 - Clickable terminology explanations, editable notes, and persistent quiz answers.
 - English speech playback using an available device voice.
 - Text export and a browser print/save-as-PDF action.
-- Optional server-side Gemini translation and study-note endpoints.
+- Server-side Genspark OpenAI-compatible translation and study-note endpoints.
 - Responsive English interface with accessible controls.
 
 **Sample transcripts, translations, subject matches, notes, and questions are prepared fixtures. They are labelled as samples. Sample playback does not produce a microphone recording.**
 
 Demo profile selection is not authentication. It separates interface data, not access permissions. School data is fictional. Clearing browser storage removes local work; this version does not sync across devices.
 
-## Optional live AI
+## Continuous voice translation
+
+See [GEMINI_LIVE_SETUP.md](GEMINI_LIVE_SETUP.md) for the hosted activation steps and short acceptance test. Live speech uses a direct Google API key; study notes keep the existing Genspark proxy.
+
+The microphone streams through an AudioWorklet to Gemini Live Translate. English audio is played directly, with a three-second local playback buffer limit. Source and English captions are saved with the original recording. Live mode does not call `/api/translate` for each sentence and does not use the browser's speech recognition or speech synthesis queues.
+
+This feature is disabled until its dedicated server flag, Google key, and app origin are configured. The hosted SSO allowlist must continue to protect `/api/live/*`.
+
+## Optional text AI
 
 All sample features work without a key. No paid AI is called by default.
 
@@ -54,12 +63,13 @@ For a local/private demonstration, copy .env.example to .env.local and configure
 
 ~~~dotenv
 STUDYMATE_ENABLE_LIVE_AI=true
-GEMINI_API_KEY=your_server_side_key
-GEMINI_MODEL=your_available_model_id
+OPENAI_API_KEY=your_server_side_proxy_key
+OPENAI_BASE_URL=your_injected_proxy_base_url
+OPENAI_MODEL=gpt-5.4-mini
 STUDYMATE_APP_ORIGIN=
 ~~~
 
-Use a Gemini model available in your account that supports generateContent with JSON output. The model is configurable so a retired model is not hard-coded.
+Use the injected Genspark OpenAI-compatible proxy. The dedicated Google live-speech key is configured separately and does not replace these credentials.
 
 Restart the server. Behind a proxy, set STUDYMATE_APP_ORIGIN to the exact browser origin (scheme, hostname, and port if present).
 
@@ -69,9 +79,9 @@ Restart the server. Behind a proxy, set STUDYMATE_APP_ORIGIN to the exact browse
 - The student confirms an AI subject suggestion before the lecture moves.
 - Requests are validated, bounded, timed out, and limited per server process. There are no automatic paid retries.
 - API keys remain server-side and are excluded from Git. Do not use NEXT_PUBLIC_ for a key.
-- Provider charges are separate from Genspark building credits.
+- Genspark proxy calls spend Genspark credits; direct Google calls follow the selected Google project's tier and quotas.
 
-Live mode sends recognised/pasted lecture text and academic context to the configured provider. Microphone audio stays in the browser in this starter. Browser speech recognition may itself use the browser vendor's online service.
+Text AI sends recognised/pasted lecture text and academic context to the configured proxy. When continuous translation is enabled, microphone audio also streams to Google. The original recording remains in browser storage. Browser speech recognition, when explicitly used as a fallback, may use the browser vendor's online service.
 
 This API is a private-demo adapter, not a production multi-user service. Keep live AI disabled on public unauthenticated deployments until authentication, per-user quotas, durable rate limiting, and server-side account isolation have been added.
 
@@ -81,11 +91,11 @@ Use a supported browser on HTTPS or localhost and allow microphone access. Brows
 
 If recognition is unavailable, save the audio, open **Transcript → Add transcript**, and paste Korean text. With live AI connected, generate study notes to translate it.
 
-Optional spoken translation uses:
+The browser fallback uses:
 
 **Browser Korean STT → server-side English translation → device English speech**
 
-This is sequential speech translation with latency, not simultaneous interpretation. Wear earphones to avoid translated speech entering the recording. Dedicated streaming STT and TTS can replace these adapters later.
+This fallback waits for speech pauses. Select live translation for continuous voice output. Wear earphones to avoid translated speech entering the microphone. Network gaps or provider limits can interrupt captions; the original recording continues and the app displays the interruption. Live captions are grouped by connection interval, not word-aligned bilingual timestamps. The existing study-note request limit remains 45,000 source characters.
 
 ## Files to edit in Genspark
 

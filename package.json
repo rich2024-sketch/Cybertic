@@ -16,7 +16,7 @@
     "build:next": "next build",
     "start:next": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "node scripts/test-studymate.mjs"
+    "test": "node scripts/test-studymate.mjs && node scripts/test-live-translation.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

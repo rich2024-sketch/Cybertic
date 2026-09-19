@@ -5,6 +5,7 @@
   "compatibility_date": "2026-05-15",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
+    "STUDYMATE_ENABLE_LIVE_TRANSLATION": "false",
     "STUDYMATE_ENABLE_LIVE_AI": "true",
     "OPENAI_MODEL": "gpt-5.4-mini",
     "GEMINI_MODEL": "gpt-5.4-mini",

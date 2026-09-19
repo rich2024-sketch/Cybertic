@@ -59,10 +59,11 @@ test("AI cannot silently file lectures under invented classes", () => {
  assert.throws(() => validateStudyResult({ ...result, translations: [{ id: "wrong", english: "Text" }] }, input), /every transcript/);
 });
 test("API rejects cross-origin and oversized requests before provider work", async () => {
- const previous = { enabled: process.env.STUDYMATE_ENABLE_LIVE_AI, key: process.env.GEMINI_API_KEY, model: process.env.GEMINI_MODEL };
- process.env.STUDYMATE_ENABLE_LIVE_AI = "true"; process.env.GEMINI_API_KEY = "test-only-not-a-real-key"; process.env.GEMINI_MODEL = "test-model";
+ const keys = ["STUDYMATE_ENABLE_LIVE_AI", "OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_MODEL", "STUDYMATE_APP_ORIGIN"];
+ const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+ Object.assign(process.env, { STUDYMATE_ENABLE_LIVE_AI: "true", OPENAI_API_KEY: "test-only-not-a-real-key", OPENAI_BASE_URL: "https://proxy.example/v1", OPENAI_MODEL: "test-model", STUDYMATE_APP_ORIGIN: "https://study.example" });
  try {
   await assert.rejects(readBody(new Request("https://study.example/api/study", { method: "POST", headers: { origin: "https://other.example", "content-type": "application/json" }, body: "{}" })), e => e.status === 403);
   await assert.rejects(readBody(new Request("https://study.example/api/study", { method: "POST", headers: { origin: "https://study.example", "content-type": "application/json" }, body: JSON.stringify({ text: "x".repeat(210000) }) })), e => e.status === 413);
- } finally { for (const [key, value] of [["STUDYMATE_ENABLE_LIVE_AI", previous.enabled], ["GEMINI_API_KEY", previous.key], ["GEMINI_MODEL", previous.model]]) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } }
+ } finally { for (const [key, value] of Object.entries(previous)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } }
 });

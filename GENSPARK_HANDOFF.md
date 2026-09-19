@@ -22,6 +22,8 @@ Keep your completion summary brief.
 
 # Later: connect live AI
 
+For continuous Korean-to-English voice translation, follow **GEMINI_LIVE_SETUP.md**. This uses a dedicated Google key and keeps the existing Genspark proxy for study notes. Apply the update to the current project; do not recreate it.
+
 Read the optional live-AI section in README.md. Keep API credentials on the server. Use the existing /api/translate and /api/study adapters, then test with a short Korean lecture and confirm its subject before saving.
 
 Do not rebuild authentication or connect a real university system for the hackathon demo.

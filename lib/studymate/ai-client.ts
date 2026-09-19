@@ -7,7 +7,7 @@ export async function aiRequest<T>(path: string, body: unknown): Promise<T> {
 }
 export type StudyResult = { title: string; subjectId: string | null; notes: StudyNotes; translations: { id: string; english: string }[] };
 export function generateStudy(segments: Segment[], student: Student, year: number) {
- return aiRequest<StudyResult>("/api/study", { segments: segments.map(({ id, korean }) => ({ id, korean })), major: student.major, year, subjects: student.subjects.map(({ id, name }) => ({ id, name })) });
+ return aiRequest<StudyResult>("/api/study", { segments: segments.filter(s => s.korean.trim()).map(({ id, korean }) => ({ id, korean })), major: student.major, year, subjects: student.subjects.map(({ id, name }) => ({ id, name })) });
 }
 export function speakEnglish(text: string) {
  if (!("speechSynthesis" in window)) return false;
